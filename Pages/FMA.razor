@@ -1,0 +1,559 @@
+﻿@page "/FMA"
+@using ApexCharts
+@using IOTWeb.Services
+@using System.Collections.Generic;
+@using System.Linq;
+@using IOTWeb.Models
+@using Microsoft.Fast.Components.FluentUI
+
+@inject HttpClient Http
+@inject WebSocketService WebSocketService
+@implements IDisposable
+
+<PageTitle>Newton's Laws: Force and Acceleration</PageTitle>
+
+<h2>Newton's Laws: Force and Acceleration</h2>
+<FluentDivider></FluentDivider>
+<FluentStack HorizontalGap="10" style="margin: 10px;">
+    <FluentButton IconStart="@(new Icons.Regular.Size16.Play())" @onclick="Start">
+        Play
+    </FluentButton>
+    <FluentButton IconStart="@(new Icons.Regular.Size16.Stop())" @onclick="Stop">
+        Stop
+    </FluentButton>
+    <FluentButton IconEnd="@(new Icons.Regular.Size16.Pause())">
+        Pause
+    </FluentButton>
+    <FluentButton IconStart="@(new Icons.Regular.Size16.ArrowClockwise())">
+        Brush
+    </FluentButton>
+    <FluentButton id="settingsPopoverButton" IconStart="@(new Icons.Regular.Size16.Settings())" @onclick="() => _settingPopoverOpen = !_settingPopoverOpen">
+        Settings
+    </FluentButton>
+    <FluentButton IconStart="@(new Icons.Regular.Size24.Wifi1())">
+        Connect
+    </FluentButton>
+    <FluentButton IconStart="@(new Icons.Regular.Size24.BookInformation())">
+        Information
+    </FluentButton>
+</FluentStack>
+
+<div style="display: flex; width=100%">
+    <FluentPopover Style="width: 500px;" VerticalThreshold="170" AnchorId="settingsPopoverButton" @bind-Open="_settingPopoverOpen">
+        <Header><h3>Cài đặt</h3></Header>
+            <Body>
+                @* FluentUI bug: style for h7 not applying, FluentStack not usable, Header not bold, can't put h5 in FluentPopover *@
+                @* <FluentStack Microsoft.Fast.Components.FluentUI.Orientation="Microsoft.Fast.Components.FluentUI.Orientation.Vertical" VerticalAlignment="VerticalAlignment.Center">
+                    <FluentStack Microsoft.Fast.Components.FluentUI.Orientation="Microsoft.Fast.Components.FluentUI.Orientation.Vertical"> *@
+                        <h5>1) Thông số thí nghiệm</h5>
+                        <FluentNumberField @bind-Value="tocDoLayMau" Label="Tốc độ lấy mẫu" />
+                        <FluentNumberField @bind-Value="thoiGianLayMau" Label="Thời gian lấy mẫu" />
+                    @* </FluentStack>
+                    <FluentStack Microsoft.Fast.Components.FluentUI.Orientation="Orientation.Vertical"> *@
+                        <br />
+                        <h5>2) Cài đặt thiết bị</h5>
+                        <FluentTextField @bind-Value="tenThietBi" Label="Tên thiết bị" />
+                        <FluentTextField @bind-Value="trangThaiThietBi" Label="Trạng thái thiết bị" />
+                    @* </FluentStack>
+                </FluentStack> *@
+            </Body>
+        <Footer></Footer>
+    </FluentPopover>
+</div>
+
+<FluentGrid Style="padding: 4px;">
+    <FluentGridItem xs="12" sm="6">
+        <div class="card" style="padding:10px;">
+            <h5>Raw Data Table</h5>
+
+            <FluentStack Microsoft.Fast.Components.FluentUI.Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                <span>Nhập dữ liệu: </span>
+                <FluentDivider Style="height: 50px;" Role="DividerRole.Presentation" Microsoft.Fast.Components.FluentUI.Orientation="Orientation.Vertical"></FluentDivider>
+                <FluentNumberField @bind-Value="@khoiLuongQuaNang" >Khối lượng quả nặng (gram)</FluentNumberField><br />
+            </FluentStack>
+
+            @if (NumberOfTime != null && NumberOfTime.Count > 0)
+            {
+                <FluentTabs @bind-ActiveTabId="activeTabId" OnTabChange="HandleOnTabChange">
+                    @{int tabIndex = 0;}
+                    @foreach (var tabData in NumberOfTime)
+                    {
+                        tabIndex++;
+                        <FluentTab Label="@($"Number: {tabIndex}")" Id="@($"tab-{tabIndex}")">
+                        <Content>
+                            @* Content of current tab *@
+                            <h6>Plotted @tabData.Count points</h6>
+
+                            @* Main table of Accel & Force *@
+                            <div style="height: 400px; overflow-y: scroll;">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Count</th>
+                                            <th scope="col">Time</th>
+                                            <th scope="col">Acceleration</th>
+                                            <th scope="col">Force</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @{
+                                            int count = 0;
+                                            double totalAccZ = 0;
+                                            double totalForce = 0;
+                                        }
+                                        @foreach (var item in tabData)
+                                        {
+                                            count++;
+                                            totalAccZ += item.AccZ;
+                                            totalForce += item.Force;
+                                            <tr>
+                                                <th scope="row">@count</th>
+                                                <td>@item.Timestamp</td>
+                                                <td>@item.AccZ</td>
+                                                <td>@item.Force</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="2">Average</th>
+                                            <td>@(Math.Round(totalAccZ / count, 2))</td>
+                                            <td>@(Math.Round(totalForce / count, 2))</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </Content>
+                    </FluentTab>
+                    }
+                </FluentTabs>
+            }
+            else
+            {
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th scope="col">Count</th>
+                            <th scope="col">Time</th>
+                            <th scope="col">Acceleration</th>
+                            <th scope="col">Force</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4">No data available.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            }
+
+            <FluentDivider></FluentDivider>
+
+            <h5 tyle="margin: 10px;">Selected Data Range</h5>
+            @if (SelectedDataRange.Count > 0)
+            {
+                <div style="height: 250px; overflow-y: scroll;">
+                    <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Time</th>
+                                    <th scope="col">Acceleration</th>
+                                    <th scope="col">Force</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in SelectedDataRange)
+                                {
+                                    <tr>
+                                        <td>@item.Timestamp</td>
+                                        <td>@item.AccZ</td>
+                                        <td>@item.Force</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                </div>
+            }
+        </div>
+    </FluentGridItem>
+
+    <FluentDivider></FluentDivider>
+
+    <FluentGridItem xs="12" sm="6">
+        <div class="card">
+            <ApexChart @ref="chartAcceleration" TItem="AccelAndForce"
+                       Title="Acceleration On Time"
+                       XAxisType="XAxisType.Numeric"
+                       Options="Accelerationoptions"
+                       OnZoomed="Zoomed"
+                       Height="250">
+                <ApexPointSeries TItem="AccelAndForce"
+                                 Items="AccelerationData"
+                                 Name="Acceleration On Time"
+                                 SeriesType="SeriesType.Line"
+                                 XValue="@(e => e.Timestamp)"
+                                 YValue="@(e => (decimal)e.AccZ)"
+                                 Stroke="@(new SeriesStroke { Width = 1, Color="#1F15E5"})"
+                                 //Stroke="@(new ApexCharts.SeriesStroke { Color = "#1F15E5", DashSpace = 0, Width = 4 })"
+
+                />
+            </ApexChart>
+
+            <ApexChart @ref="chartForce" TItem="AccelAndForce"
+                       Title="Force On Time"
+                       XAxisType="XAxisType.Numeric"
+                       Options="Forceoptions"
+                       OnZoomed="Zoomed"
+                       Height="250">
+                <ApexPointSeries TItem="AccelAndForce"
+                                 Items="ForceData"
+                                 Name="Force On Time"
+                                 SeriesType="SeriesType.Line"
+                                 XValue="@(e => e.Timestamp)"
+                                 YValue="@(e => (decimal)e.Force)"
+                                 Stroke="@(new SeriesStroke { Width = 1, Color = "#E51C15"})" />
+            </ApexChart>
+        </div>
+    </FluentGridItem>
+</FluentGrid>
+
+@code {
+    private string activeTabId = "tab-1";  // Default to the first tab
+    //Data for NumberOfTime To Show Table
+    private List<List<AccelAndForce>> NumberOfTime = new List<List<AccelAndForce>>();
+    //Data for Select Range On Chart
+    private List<AccelAndForce> SelectedDataRange = new List<AccelAndForce>();
+    
+    //Data for settings
+    bool _settingPopoverOpen;
+    private long tocDoLayMau = 100;
+    private int thoiGianLayMau = 5;
+    private string tenThietBi = "ABCD_DEVICE";
+    private string trangThaiThietBi = "ONLINE";
+    
+    //Data for weight mass
+    private double khoiLuongQuaNang = 0.0;
+
+    //Data for AccelAndForce
+    private List<AccelAndForce> AAFData = new List<AccelAndForce>(); 
+    //Data for Acceleration
+    private List<AccelAndForce> AccelerationData = new List<AccelAndForce>();
+    //Data for Force
+    private List<AccelAndForce> ForceData = new List<AccelAndForce>();
+
+    //Intial Chart
+    private ApexChart<AccelAndForce>? AAFoptions;
+    private ApexChart<AccelAndForce>? chartAcceleration;
+    private ApexChart<AccelAndForce>? chartForce;
+
+    //Innitail Option 
+    //private ApexChartOptions<AccelAndForce>? options;
+    private ApexChartOptions<AccelAndForce>? Accelerationoptions;
+    private ApexChartOptions<AccelAndForce>? Forceoptions;
+
+    private bool IsWebSocketConnected = false;
+    private Timer? UpdateTimer;
+
+
+
+    protected override void OnInitialized()
+    {
+        Accelerationoptions = new ApexChartOptions<AccelAndForce>
+        {
+            Chart = new Chart
+            {
+                Animations = new Animations
+                {
+                    Enabled = true,
+                    Easing = Easing.Linear,
+                    DynamicAnimation = new DynamicAnimation
+                    {
+                        Speed = 950
+                    }
+                }
+            },
+            Xaxis = new XAxis
+            {
+                DecimalsInFloat = 2,
+                TickPlacement = TickPlacement.Between
+            },
+            Stroke = new Stroke { Curve = Curve.Straight }
+            @* Stroke = new Stroke { Width = 4, Curve = Curve.Smooth } *@
+        };
+
+        Forceoptions = new ApexChartOptions<AccelAndForce>
+        {
+            Chart = new Chart
+            {
+                Animations = new Animations
+                {
+                    Enabled = true,
+                    Easing = Easing.Linear,
+                    DynamicAnimation = new DynamicAnimation
+                    {
+                            Speed = 950
+                    }
+                }
+            },
+            Xaxis = new XAxis
+            {
+                DecimalsInFloat = 2,
+                TickPlacement = TickPlacement.Between
+            },
+            Stroke = new Stroke { Curve = Curve.Straight }
+        };
+        WebSocketService.OnAccelAndForceReceived += HandleAccelAndForceReceived;
+    }
+
+    private async Task Start()
+    {
+        if (!IsWebSocketConnected)
+        {
+            try
+            {
+                IsWebSocketConnected = true;
+                AccelerationData.Clear();
+                ForceData.Clear();
+                UpdateTimer = new Timer(_ => UpdateChart(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(40));
+                await WebSocketService.StartAsync();
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error starting WebSocket: {ex.Message}");
+                IsWebSocketConnected = false;
+            }
+        }
+    }
+
+    //Handle data when receive data from socket
+    private void HandleAccelAndForceReceived(AccelAndForce data)
+    {
+        //Delete head element of list and add new data when reach 100
+        if (AccelerationData.Count > 80)
+        {
+            AccelerationData.RemoveAt(0);
+        }
+        if (ForceData.Count > 80)
+        {
+            ForceData.RemoveAt(0);
+        }
+        AAFData.Add(data);
+        AccelerationData.Add(new AccelAndForce
+            {
+                Timestamp = data.Timestamp,
+                AccX = 0,
+                AccY = 0,
+                AccZ = data.AccZ,
+                Force = 0 
+            });
+        ForceData.Add(new AccelAndForce
+            {
+                Timestamp = data.Timestamp,
+                AccX = 0,
+                AccY = 0,
+                AccZ = 0,
+                Force = data.Force
+            });
+    }
+
+    // Update chart with new list
+    private void UpdateChart()
+    {
+        InvokeAsync(() =>
+        {
+            chartAcceleration?.UpdateSeriesAsync(true);
+            chartForce?.UpdateSeriesAsync(true);
+        });
+    }
+
+    private void Stop()
+    {
+        if (IsWebSocketConnected)
+        {
+            WebSocketService.Stop();
+            IsWebSocketConnected = false;
+            UpdateTimer?.Dispose();
+
+            if (AAFData.Any())
+            {
+                // Store the current measure in the history (NumberOfTime)
+                NumberOfTime.Add(CopyAccelAndForceList(AAFData));
+
+                // Clear AAFData for new measurements
+                AAFData.Clear();
+            }
+
+            // Re-render the charts with the latest data
+            ReRenderChart();
+        }
+    }
+
+    // Track active tab and trigger chart re-render when necessary
+    // Handle tab change event
+    private async void HandleOnTabChange(FluentTab tab)
+    {
+        // Console.WriteLine("Tab changed to: " + tab.Label);  // Debugging log
+        
+        // Extract the numeric part of the Tab Id (e.g., "tab-4" -> 4)
+        string tabId = tab.Id;
+        if (tabId.StartsWith("tab-") && int.TryParse(tabId.Substring(4), out int tabIndex))
+        {
+            // Convert 1-based tab index to 0-based dataset index
+            tabIndex -= 1;
+            
+            // Ensure the index is within the bounds of the NumberOfTime list
+            if (tabIndex >= 0 && tabIndex < NumberOfTime.Count)
+            {
+                // Re-render the chart for the selected tab's dataset
+                await ReRenderChartForTab(tabIndex);
+            }
+            else
+            {
+                Console.WriteLine("Tab index out of bounds");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Invalid tab Id format: " + tabId);
+        }
+    }
+
+    private async Task ReRenderChartForTab(int tabIndex)
+    {
+        // Clear the current data from the charts
+        AccelerationData.Clear();
+        ForceData.Clear();
+
+        // Fetch the selected dataset from NumberOfTime
+        var selectedDataSet = NumberOfTime[tabIndex];
+        foreach (var item in selectedDataSet)
+        {
+            AccelerationData.Add(new AccelAndForce { Timestamp = item.Timestamp, AccZ = item.AccZ, Force = 0 });
+            ForceData.Add(new AccelAndForce { Timestamp = item.Timestamp, AccZ = 0, Force = item.Force });
+        }
+
+        // Render the charts with the new data
+        if (chartAcceleration != null && chartForce != null)
+        {
+            await chartAcceleration.UpdateSeriesAsync(true);
+            await chartForce.UpdateSeriesAsync(true);
+        }
+    }
+
+    private async Task ReRenderChart()
+    {
+        // Clear current data from the charts
+        AccelerationData.Clear();
+        ForceData.Clear();
+
+        // Copy the latest set of AccelAndForce data from NumberOfTime (assuming we want the last recorded set)
+        if (NumberOfTime.Any())
+        {
+            var lastDataSet = NumberOfTime.Last();  // Get the last recorded data set
+            foreach (var item in lastDataSet)
+            {
+                AccelerationData.Add(new AccelAndForce { Timestamp = item.Timestamp, AccZ = item.AccZ, Force = 0 });
+                ForceData.Add(new AccelAndForce { Timestamp = item.Timestamp, AccZ = 0, Force = item.Force });
+            }
+        }
+
+        // Render the charts with the new data
+
+        // the below lines does not fucking re-render chart or any UI update !
+        @* if (chartAcceleration != null && chartForce != null)
+        {
+            await chartAcceleration.UpdateSeriesAsync(true);
+            await chartForce.UpdateSeriesAsync(true);
+        } *@
+
+        // these 2 lines worked
+        chartAcceleration?.RenderAsync();
+        chartForce?.RenderAsync();
+
+    }
+
+    //Copy list to rerender chart
+    List<AccelAndForce> CopyAccelAndForceList(List<AccelAndForce> originalList)
+    {
+        List<AccelAndForce> copiedList = new List<AccelAndForce>();
+
+        foreach (var item in originalList)
+        {
+            copiedList.Add(new AccelAndForce
+                {
+                    Timestamp = item.Timestamp,
+                    AccZ = item.AccZ,
+                    Force = item.Force
+                });
+        }
+
+        return copiedList;
+    }
+
+    //Using zoomed evet in apexchart to select range data on chart
+    private async void Zoomed(ZoomedData<AccelAndForce> zoomedData)
+    {
+        if (zoomedData.IsZoomed)
+        {
+            float min = zoomedData.XAxis.Min.HasValue ? (float)Math.Round(zoomedData.XAxis.Min.Value, 2) : 0f;
+            float max = zoomedData.XAxis.Max.HasValue ? (float)Math.Round(zoomedData.XAxis.Max.Value, 2) : 0f;
+
+            //Initial range selected x -> x2
+            var RangeSlected = new AnnotationsXAxis
+                {
+                    X = min,
+                    X2 = max,
+                    FillColor = "#9AEBA3",
+                    BorderWidth = 5,
+                };
+
+            if (zoomedData.Chart != null)
+            {
+              
+                //Add range selected x -> x2
+                await zoomedData.Chart.AddXAxisAnnotationAsync(RangeSlected, false);
+
+                if (zoomedData.Chart.ChartId == chartAcceleration.ChartId)
+                {
+                    var Selected = AccelerationData.Where(item => item.Timestamp >= min && item.Timestamp <= max).ToList();
+                    //Add vertical line x -> x
+                    foreach(var item in Selected)
+                    {
+                        var Point = new AnnotationsXAxis
+                            {
+                                X = item.Timestamp,
+                                BorderColor = "#45C4B0",
+                                StrokeDashArray = 0
+                            };
+                        await zoomedData.Chart.AddXAxisAnnotationAsync(Point, false);
+                    }
+                    SelectedDataRange = Selected;
+                }
+                else
+                {
+                    var Selected = ForceData.Where(item => item.Timestamp >= min && item.Timestamp <= max).ToList();
+                    //Add vertical line x -> x
+                    foreach (var item in Selected)
+                    {
+                        var Point = new AnnotationsXAxis
+                            {
+                                X = item.Timestamp,
+                                BorderColor = "#45C4B0",
+                                StrokeDashArray = 0
+                            };
+                        await zoomedData.Chart.AddXAxisAnnotationAsync(Point, false);
+                    }
+                    SelectedDataRange = Selected;
+                }
+            }
+        }
+    }
+
+    //Disconnect Socket when component is disposed
+    public void Dispose()
+    {
+        WebSocketService.OnAccelAndForceReceived -= HandleAccelAndForceReceived;
+        Stop();
+    }
+}

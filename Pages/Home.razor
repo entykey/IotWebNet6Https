@@ -1,0 +1,36 @@
+﻿@page "/"
+@using Microsoft.Fast.Components.FluentUI
+
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new Fluent Blazor app.
+
+
+<div style="display: flex; width=100%">
+    <FluentButton id="myPopoverButtonl" Appearance="Appearance.Accent" @onclick="() => _visibleL = !_visibleL">
+        Open Callout 1
+    </FluentButton>
+
+    <FluentSpacer />
+
+
+    <FluentPopover Style="width: 300px;" VerticalThreshold="170" AnchorId="myPopoverButtonl" @bind-Open="_visibleL">
+        <Header>Callout Header</Header>
+        <Body>
+            <FluentStack Orientation="Orientation.Vertical">
+                <FluentCheckbox>Item 1</FluentCheckbox>
+                <FluentCheckbox>Item 2</FluentCheckbox>
+                <FluentTextField tabindex="0"></FluentTextField>
+            </FluentStack>
+        </Body>
+        <Footer>Callout Footer</Footer>
+    </FluentPopover>
+    
+</div>
+
+@code {
+    bool _visibleL;
+}
