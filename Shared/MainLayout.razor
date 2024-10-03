@@ -13,17 +13,40 @@
         <article class="content px-4">
             @Body
         </article>
+
+        <FluentToastProvider MaxToastCount="10" />
     </main>
 </div> *@
 
 
 
 @inherits LayoutComponentBase
+@using Blazored.Toast.Configuration
+
+@* Add Blazored.Toast container *@
+<BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.TopRight"
+                Timeout="3"
+                IconType="IconType.Material"
+                ErrorIcon="Error"
+                InfoIcon="Info"
+                SuccessIcon="Success"
+                WarningIcon="Warning"
+                ShowProgressBar="@true"
+                ShowCloseButton="@true"
+                MaxToastCount="3">
+    <CloseButtonContent>
+        <div>
+            <span class="myCloseButtonStyleClass">&times;</span>
+        </div>
+    </CloseButtonContent>
+</BlazoredToasts>
 
 <FluentLayout>
+    
     <FluentHeader>
         IOTWeb
     </FluentHeader>
+
     <FluentStack Class="main" Orientation="Orientation.Horizontal" Width="100%">
         <NavMenu />
         <FluentBodyContent Class="body-content">
@@ -37,11 +60,11 @@
                     <div class="blazor-error-boundary">@ex.Message</div>
                 </ErrorContent>
             </ErrorBoundary>
+
+
+            @* FluentUI toast service never worked, dont waste time !! *@
+            @* <FluentToastProvider MaxToastCount="10" /> *@
         </FluentBodyContent>
     </FluentStack>
-    @* <FluentFooter>
-        <a href="https://www.fluentui-blazor.net" target="_blank">Documentation and demos</a>
-        <FluentSpacer />
-        <a href="https://learn.microsoft.com/en-us/aspnet/core/blazor" target="_blank">About Blazor</a>
-    </FluentFooter> *@
+
 </FluentLayout>

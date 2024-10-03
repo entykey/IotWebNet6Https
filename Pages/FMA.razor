@@ -8,6 +8,9 @@
 
 @inject HttpClient Http
 @inject WebSocketService WebSocketService
+@inject HttpControlService HttpControlService
+@using Blazored.Toast.Configuration
+@inject Blazored.Toast.Services.IToastService ToastService
 @implements IDisposable
 
 <PageTitle>Newton's Laws: Force and Acceleration</PageTitle>
@@ -52,7 +55,7 @@
                     <FluentStack Microsoft.Fast.Components.FluentUI.Orientation="Orientation.Vertical"> *@
                         <br />
                         <h5>2) Cài đặt thiết bị</h5>
-                        <FluentTextField @bind-Value="tenThietBi" Label="Tên thiết bị" />
+                        <FluentTextField @bind-Value="idThietBi" Label="ID thiết bị" />
                         <FluentTextField @bind-Value="trangThaiThietBi" Label="Trạng thái thiết bị" />
                     @* </FluentStack>
                 </FluentStack> *@
@@ -228,7 +231,7 @@
     bool _settingPopoverOpen;
     private long tocDoLayMau = 100;
     private int thoiGianLayMau = 5;
-    private string tenThietBi = "ABCD_DEVICE";
+    private string idThietBi = "ABCD";
     private string trangThaiThietBi = "ONLINE";
     
     //Data for weight mass
@@ -253,11 +256,15 @@
 
     private bool IsWebSocketConnected = false;
     private Timer? UpdateTimer;
-
+    // Blazored.Toast config:
+    private Blazored.Toast.ToastParameters _toastParameters = default!;
 
 
     protected override void OnInitialized()
     {
+        // init Blazored.Toast
+        _toastParameters = new Blazored.Toast.ToastParameters();
+
         Accelerationoptions = new ApexChartOptions<AccelAndForce>
         {
             Chart = new Chart
@@ -306,7 +313,9 @@
     }
 
     private async Task Start()
-    {
+    {   
+        // start device streaming via HTTP control
+        await StartStreamingUsingHttpControl();
         if (!IsWebSocketConnected)
         {
             try
@@ -314,7 +323,9 @@
                 IsWebSocketConnected = true;
                 AccelerationData.Clear();
                 ForceData.Clear();
-                UpdateTimer = new Timer(_ => UpdateChart(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(40));
+                // 10ms - 100ms -> fast, little laggy effect
+                // 200ms + -> little slow, but no laggy effect
+                UpdateTimer = new Timer(_ => UpdateChart(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(20));
                 await WebSocketService.StartAsync();
                 StateHasChanged();
             }
@@ -367,8 +378,9 @@
         });
     }
 
-    private void Stop()
+    private async Task Stop()
     {
+        await StopStreamingUsingHttpControl();
         if (IsWebSocketConnected)
         {
             WebSocketService.Stop();
@@ -387,6 +399,66 @@
             // Re-render the charts with the latest data
             ReRenderChart();
         }
+    }
+
+    public async Task StartStreamingUsingHttpControl()
+    {
+        var httpClient = new HttpClient();
+
+        var httpControlService = new HttpControlService(httpClient);
+
+        // Example parameters
+        string deviceId = idThietBi;
+        string commandType = "control";
+        string actionType = "start";
+        string requestType = "req";       // This could be "req" to send a request
+        string httpRequestType = "POST";  // Or "GET" for get requests
+
+        // Call the service to send the control request and get the status code
+        int statusCode = await httpControlService.SendControlRequest(deviceId, commandType, actionType, requestType, httpRequestType);
+
+        // Check status code
+        if (statusCode == 200)
+        {
+            ToastService.ShowSuccess($"StartStreaming Request was successful with status code: {statusCode}");
+            @* Console.WriteLine("StartStreaming Request was successful."); *@
+        }
+        else
+        {
+            ToastService.ShowError($"StartStreaming Request failed with status code: {statusCode}");
+            @* Console.WriteLine($"StartStreaming Request failed with status code: {statusCode}"); *@
+        }
+        httpClient.Dispose();
+    }
+
+    public async Task StopStreamingUsingHttpControl()
+    {
+        var httpClient = new HttpClient();
+
+        var httpControlService = new HttpControlService(httpClient);
+
+        // Example parameters
+        string deviceId = idThietBi;
+        string commandType = "control";
+        string actionType = "stop";
+        string requestType = "req";       // This could be "req" to send a request
+        string httpRequestType = "POST";  // Or "GET" for get requests
+
+        // Call the service to send the control request and get the status code
+        int statusCode = await httpControlService.SendControlRequest(deviceId, commandType, actionType, requestType, httpRequestType);
+
+        // Check status code
+        if (statusCode == 200)
+        {
+            ToastService.ShowSuccess($"StopStreaming Request was successful with status code: {statusCode}");
+            //Console.WriteLine("StopStreaming Request was successful.");
+        }
+        else
+        {
+            ToastService.ShowError($"StopStreaming Request failed with status code: {statusCode}");
+            //Console.WriteLine($"StopStreaming Request failed with status code: {statusCode}");
+        }
+        httpClient.Dispose();
     }
 
     // Track active tab and trigger chart re-render when necessary
